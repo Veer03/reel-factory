@@ -544,6 +544,18 @@ body {
   margin-bottom: 18px;
   flex-wrap: wrap;
 }
+
+.batch-picker {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.batch-picker .field {
+  flex: 1;
+  min-width: 160px;
+}
 #comboSummary {
   margin: 0;
 }

@@ -71,6 +71,7 @@
     backgrounds: [],
     overlays: [],
     results: [],
+    queue: [], // {id, bg, ov}
   };
   let idSeq = 1;
   const uid = () => "id" + idSeq++;
@@ -111,8 +112,12 @@
   const overlayEmptyHint = $("#overlayEmptyHint");
 
   const comboSummary = $("#comboSummary");
-  const comboPreview = $("#comboPreview");
+  const pickBg = $("#pickBg");
+  const pickOv = $("#pickOv");
+  const addToQueueBtn = $("#addToQueueBtn");
+  const queueList = $("#queueList");
   const generateBtn = $("#generateBtn");
+
   const progressArea = $("#progressArea");
   const progressFill = $("#progressFill");
   const progressLabel = $("#progressLabel");
@@ -514,30 +519,66 @@
   }
 
   /* ============================================================
-     STEP 5 — combos + generation
+     STEP 5 — queue-based batch builder
      ============================================================ */
-  function getCombos() {
-    const bgs = state.backgrounds;
-    const ovs = state.overlays.length ? state.overlays : [null];
-    const combos = [];
-    bgs.forEach((bg) => ovs.forEach((ov) => combos.push({ bg, ov })));
-    return combos;
+  function populatePickers() {
+    const curBg = pickBg.value,
+      curOv = pickOv.value;
+    pickBg.innerHTML = state.backgrounds
+      .map((bg) => `<option value="${bg.id}">${escapeHtml(bg.name)}</option>`)
+      .join("");
+    pickOv.innerHTML =
+      '<option value="">— no text —</option>' +
+      state.overlays
+        .map(
+          (ov) =>
+            `<option value="${ov.id}">${escapeHtml(ov.text.slice(0, 30))}</option>`,
+        )
+        .join("");
+    if (state.backgrounds.some((b) => b.id === curBg)) pickBg.value = curBg;
+    if (state.overlays.some((o) => o.id === curOv)) pickOv.value = curOv;
+  }
+
+  addToQueueBtn.addEventListener("click", () => {
+    if (!state.backgrounds.length) return;
+    const bg =
+      state.backgrounds.find((b) => b.id === pickBg.value) ||
+      state.backgrounds[0];
+    const ov = state.overlays.find((o) => o.id === pickOv.value) || null;
+    state.queue.push({ id: uid(), bg, ov });
+    renderQueueList();
+    updateComboSummary();
+  });
+
+  function renderQueueList() {
+    queueList.innerHTML = "";
+    state.queue.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "overlay-row";
+      const swatchBg = item.bg.type === "color" ? item.bg.value : "#000";
+      row.innerHTML = `
+        <div class="swatch" style="background:${swatchBg}"></div>
+        <div class="info">
+          <div class="txt">${escapeHtml(item.bg.name)}${item.ov ? ' + "' + escapeHtml(item.ov.text.slice(0, 24)) + '"' : " (no text)"}</div>
+        </div>
+        <button class="remove-x" title="remove">✕</button>`;
+      row.querySelector(".remove-x").addEventListener("click", () => {
+        state.queue = state.queue.filter((q) => q.id !== item.id);
+        renderQueueList();
+        updateComboSummary();
+      });
+      queueList.appendChild(row);
+    });
   }
 
   function updateComboSummary() {
-    const combos = getCombos();
-    const n = state.backgrounds.length ? combos.length : 0;
-    if (!n) {
-      comboPreview.innerHTML = "";
-      comboSummary.textContent =
-        "Add at least one background to see how many videos you'll get.";
-      generateBtn.disabled = true;
-      return;
-    }
-    unlock(step5);
-    const ovCount = state.overlays.length || 0;
-    comboSummary.innerHTML = `<span class="combo-count">${n}</span> video${n === 1 ? "" : "s"} will be generated — ${state.backgrounds.length} background${state.backgrounds.length === 1 ? "" : "s"}${ovCount ? ` × ${ovCount} text overlay${ovCount === 1 ? "" : "s"}` : " (no text)"}`;
-    generateBtn.disabled = !state.file;
+    if (state.backgrounds.length > 0) unlock(step5);
+    populatePickers();
+    const n = state.queue.length;
+    comboSummary.textContent = n
+      ? `${n} video${n === 1 ? "" : "s"} queued and ready to generate.`
+      : 'Pick a background + overlay above, then "add to batch." Repeat for every video you want.';
+    generateBtn.disabled = !state.file || n === 0;
   }
   updateComboSummary();
 
@@ -574,7 +615,7 @@
   generateBtn.addEventListener("click", runBatch);
 
   async function runBatch() {
-    const combos = getCombos();
+    const combos = state.queue;
     if (!combos.length || !state.file) return;
 
     generateBtn.disabled = true;
@@ -629,6 +670,15 @@
           txCtx.clearRect(0, 0, W, H);
           await drawTextOverlay(txCtx, combo.ov, W, H, 1);
           const txBytes = await canvasToPngBytes(txCanvas);
+          if (i === 0) {
+            const dbgUrl = URL.createObjectURL(
+              new Blob([txBytes], { type: "image/png" }),
+            );
+            const a = document.createElement("a");
+            a.href = dbgUrl;
+            a.download = "debug-text-layer.png";
+            a.click();
+          }
           await ffmpeg.writeFile("tx.png", txBytes);
           hasText = true;
         }
