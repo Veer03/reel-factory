@@ -1,183 +1,268 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Reel Factory — batch video generator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Caveat:wght@700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&family=Montserrat:wght@800&family=Oswald:wght@600&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:wght@700&family=Poppins:wght@700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reel Factory — batch video generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Caveat:wght@700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&family=Montserrat:wght@800&family=Oswald:wght@600&family=Pacifico&family=Permanent+Marker&family=Playfair+Display:wght@700&family=Poppins:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="grain"></div>
 
-<div class="grain"></div>
-
-<header class="top">
-  <div class="top-inner">
-    <div class="brand">
-      <span class="brand-mark">RF</span>
-      <div class="brand-text">
-        <h1>Reel Factory</h1>
-        <p>one raw clip in → a batch of ready-to-post reels out</p>
-      </div>
-    </div>
-    <div class="brand-status" id="engineStatus">
-      <span class="dot" id="engineDot"></span>
-      <span id="engineStatusText">engine idle</span>
-    </div>
-  </div>
-</header>
-
-<main class="wrap">
-
-  <!-- STEP 1 -->
-  <section class="card" id="step1">
-    <div class="step-head">
-      <span class="step-no">01</span>
-      <div>
-        <h2>Drop the raw clip</h2>
-        <p class="sub">Any orientation, any size — we'll fit it into whatever format you pick below.</p>
-      </div>
-    </div>
-
-    <div class="dropzone" id="dropzone">
-      <input type="file" id="fileInput" accept="video/*" hidden>
-      <div class="dropzone-inner" id="dropzoneInner">
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M12 4L7 9M12 4L17 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16V18C4 19.1046 4.89543 20 6 20H18C19.1046 20 20 19.1046 20 18V16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <p><strong>Click to choose</strong> or drag a video file here</p>
-        <p class="hint">MP4, MOV, WEBM — processed entirely on this machine, nothing uploads anywhere</p>
-      </div>
-      <video id="previewVideo" hidden playsinline muted></video>
-    </div>
-
-    <div class="source-meta" id="sourceMeta" hidden>
-      <div class="meta-chip"><span class="meta-label">file</span><span id="metaName">—</span></div>
-      <div class="meta-chip"><span class="meta-label">resolution</span><span id="metaRes">—</span></div>
-      <div class="meta-chip"><span class="meta-label">orientation</span><span id="metaOrient">—</span></div>
-      <div class="meta-chip"><span class="meta-label">length</span><span id="metaDur">—</span></div>
-      <button class="ghost-btn small" id="changeFileBtn">change file</button>
-    </div>
-  </section>
-
-  <!-- STEP 2 -->
-  <section class="card locked" id="step2">
-    <div class="step-head">
-      <span class="step-no">02</span>
-      <div>
-        <h2>Pick the output format</h2>
-        <p class="sub">The clip gets scaled down to fit inside this frame — the rest fills with your background.</p>
-      </div>
-    </div>
-    <div class="format-grid" id="formatGrid"></div>
-  </section>
-
-  <!-- STEP 3 -->
-  <section class="card locked" id="step3">
-    <div class="step-head">
-      <span class="step-no">03</span>
-      <div>
-        <h2>Backgrounds</h2>
-        <p class="sub">Add every color or image you want in the mix. Each one becomes its own version of the video.</p>
-      </div>
-    </div>
-
-    <div class="add-row">
-      <button class="ghost-btn" id="addColorBtn">+ solid color</button>
-      <button class="ghost-btn" id="addImageBtn">+ background image</button>
-      <input type="file" id="bgImageInput" accept="image/*" hidden multiple>
-    </div>
-
-    <div class="chip-grid" id="bgList"></div>
-    <p class="empty-hint" id="bgEmptyHint">No backgrounds yet — add at least one.</p>
-  </section>
-
-  <!-- STEP 4 -->
-  <section class="card locked" id="step4">
-    <div class="step-head">
-      <span class="step-no">04</span>
-      <div>
-        <h2>Text overlays</h2>
-        <p class="sub">Write each caption / hook you want tested, pick its font, color and spot on screen.</p>
-      </div>
-    </div>
-
-    <div class="overlay-form">
-      <textarea id="overlayText" placeholder="e.g. WAIT FOR IT…" rows="2"></textarea>
-      <div class="overlay-controls">
-        <div class="field">
-          <label>font</label>
-          <select id="overlayFont"></select>
+    <header class="top">
+      <div class="top-inner">
+        <div class="brand">
+          <span class="brand-mark">RF</span>
+          <div class="brand-text">
+            <h1>Reel Factory</h1>
+            <p>one raw clip in → a batch of ready-to-post reels out</p>
+          </div>
         </div>
-        <div class="field">
-          <label>color</label>
-          <input type="color" id="overlayColor" value="#ffffff">
-        </div>
-        <div class="field">
-          <label>size</label>
-          <input type="range" id="overlaySize" min="24" max="140" value="64">
-        </div>
-        <div class="field">
-          <label>position</label>
-          <select id="overlayPosition">
-            <option value="top">top</option>
-            <option value="center" selected>center</option>
-            <option value="bottom">bottom</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>style</label>
-          <select id="overlayStyle">
-            <option value="fill">flat</option>
-            <option value="stroke" selected>outline + shadow</option>
-            <option value="badge">on a badge</option>
-          </select>
+        <div class="brand-status" id="engineStatus">
+          <span class="dot" id="engineDot"></span>
+          <span id="engineStatusText">engine idle</span>
         </div>
       </div>
-      <div class="overlay-add-row">
-        <canvas id="overlayLivePreview" width="220" height="120"></canvas>
-        <button class="primary-btn small" id="addOverlayBtn">+ add this overlay</button>
-      </div>
-    </div>
+    </header>
 
-    <div class="stack-list" id="overlayList"></div>
-    <p class="empty-hint" id="overlayEmptyHint">No text overlays yet. You can also generate without text — just skip this.</p>
-  </section>
+    <main class="wrap">
+      <!-- STEP 1 -->
+      <section class="card" id="step1">
+        <div class="step-head">
+          <span class="step-no">01</span>
+          <div>
+            <h2>Drop the raw clip</h2>
+            <p class="sub">
+              Any orientation, any size — we'll fit it into whatever format you
+              pick below.
+            </p>
+          </div>
+        </div>
 
-  <!-- STEP 5 -->
-  <section class="card locked" id="step5">
-    <div class="step-head">
-      <span class="step-no">05</span>
-      <div>
-        <h2>Generate the batch</h2>
-        <p class="sub" id="comboSummary">Add backgrounds and/or overlays to see how many videos you'll get.</p>
-      </div>
-    </div>
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" accept="video/*" hidden />
+          <div class="dropzone-inner" id="dropzoneInner">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 16V4M12 4L7 9M12 4L17 9"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M4 16V18C4 19.1046 4.89543 20 6 20H18C19.1046 20 20 19.1046 20 18V16"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <p><strong>Click to choose</strong> or drag a video file here</p>
+            <p class="hint">
+              MP4, MOV, WEBM — processed entirely on this machine, nothing
+              uploads anywhere
+            </p>
+          </div>
+          <video id="previewVideo" hidden playsinline muted></video>
+        </div>
 
-    <div class="combo-preview" id="comboPreview"></div>
+        <div class="source-meta" id="sourceMeta" hidden>
+          <div class="meta-chip">
+            <span class="meta-label">file</span><span id="metaName">—</span>
+          </div>
+          <div class="meta-chip">
+            <span class="meta-label">resolution</span
+            ><span id="metaRes">—</span>
+          </div>
+          <div class="meta-chip">
+            <span class="meta-label">orientation</span
+            ><span id="metaOrient">—</span>
+          </div>
+          <div class="meta-chip">
+            <span class="meta-label">length</span><span id="metaDur">—</span>
+          </div>
+          <button class="ghost-btn small" id="changeFileBtn">
+            change file
+          </button>
+        </div>
+      </section>
 
-    <button class="primary-btn big" id="generateBtn" disabled>Generate all videos</button>
+      <!-- STEP 2 -->
+      <section class="card locked" id="step2">
+        <div class="step-head">
+          <span class="step-no">02</span>
+          <div>
+            <h2>Pick the output format</h2>
+            <p class="sub">
+              The clip gets scaled down to fit inside this frame — the rest
+              fills with your background.
+            </p>
+          </div>
+        </div>
+        <div class="format-grid" id="formatGrid"></div>
+      </section>
 
-    <div class="progress-area" id="progressArea" hidden>
-      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-      <p class="progress-label" id="progressLabel">Loading engine…</p>
-      <div class="filmstrip" id="filmstrip"></div>
-    </div>
+      <!-- STEP 3 -->
+      <section class="card locked" id="step3">
+        <div class="step-head">
+          <span class="step-no">03</span>
+          <div>
+            <h2>Backgrounds</h2>
+            <p class="sub">
+              Add every color or image you want in the mix. Each one becomes its
+              own version of the video.
+            </p>
+          </div>
+        </div>
 
-    <div class="results-bar" id="resultsBar" hidden>
-      <p><strong id="resultsCount">0</strong> videos ready</p>
-      <button class="primary-btn" id="downloadZipBtn">Download all (.zip)</button>
-    </div>
-  </section>
+        <div class="add-row">
+          <button class="ghost-btn" id="addColorBtn">+ solid color</button>
+          <button class="ghost-btn" id="addImageBtn">+ background image</button>
+          <input
+            type="file"
+            id="bgImageInput"
+            accept="image/*"
+            hidden
+            multiple
+          />
+        </div>
 
-</main>
+        <div class="chip-grid" id="bgList"></div>
+        <p class="empty-hint" id="bgEmptyHint">
+          No backgrounds yet — add at least one.
+        </p>
+      </section>
 
-<footer class="foot">
-  <p>Runs fully in your browser — your video never leaves this computer.</p>
-</footer>
+      <!-- STEP 4 -->
+      <section class="card locked" id="step4">
+        <div class="step-head">
+          <span class="step-no">04</span>
+          <div>
+            <h2>Text overlays</h2>
+            <p class="sub">
+              Write each caption / hook you want tested, pick its font, color
+              and spot on screen.
+            </p>
+          </div>
+        </div>
 
-<script src="vendor/jszip.min.js"></script>
-<script src="vendor/ffmpeg.js"></script>
-<script src="app.js"></script>
-</body>
+        <div class="overlay-form">
+          <textarea
+            id="overlayText"
+            placeholder="e.g. WAIT FOR IT…"
+            rows="2"
+          ></textarea>
+          <div class="overlay-controls">
+            <div class="field">
+              <label>font</label>
+              <select id="overlayFont"></select>
+            </div>
+            <div class="field">
+              <label>color</label>
+              <input type="color" id="overlayColor" value="#ffffff" />
+            </div>
+            <div class="field">
+              <label>size</label>
+              <input
+                type="range"
+                id="overlaySize"
+                min="24"
+                max="140"
+                value="64"
+              />
+            </div>
+            <div class="field">
+              <label>position</label>
+              <select id="overlayPosition">
+                <option value="top">top</option>
+                <option value="center" selected>center</option>
+                <option value="bottom">bottom</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>style</label>
+              <select id="overlayStyle">
+                <option value="fill">flat</option>
+                <option value="stroke" selected>outline + shadow</option>
+                <option value="badge">on a badge</option>
+              </select>
+            </div>
+          </div>
+          <div class="overlay-add-row">
+            <canvas id="overlayLivePreview" width="220" height="120"></canvas>
+            <button class="primary-btn small" id="addOverlayBtn">
+              + add this overlay
+            </button>
+          </div>
+        </div>
+
+        <div class="stack-list" id="overlayList"></div>
+        <p class="empty-hint" id="overlayEmptyHint">
+          No text overlays yet. You can also generate without text — just skip
+          this.
+        </p>
+      </section>
+
+      <!-- STEP 5 -->
+      <section class="card locked" id="step5">
+        <div class="step-head">
+          <span class="step-no">05</span>
+          <div>
+            <h2>Generate the batch</h2>
+            <p class="sub" id="comboSummary">
+              Add backgrounds and/or overlays to see how many videos you'll get.
+            </p>
+          </div>
+        </div>
+
+        <div class="batch-picker">
+          <div class="field">
+            <label>background</label>
+            <select id="pickBg"></select>
+          </div>
+          <div class="field">
+            <label>text overlay</label>
+            <select id="pickOv">
+              <option value="">— no text —</option>
+            </select>
+          </div>
+          <button class="ghost-btn" id="addToQueueBtn">+ add to batch</button>
+        </div>
+        <div class="stack-list" id="queueList"></div>
+        <button class="primary-btn big" id="generateBtn" disabled>
+          Generate all videos
+        </button>
+
+        <div class="progress-area" id="progressArea" hidden>
+          <div class="progress-track">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <p class="progress-label" id="progressLabel">Loading engine…</p>
+          <div class="filmstrip" id="filmstrip"></div>
+        </div>
+
+        <div class="results-bar" id="resultsBar" hidden>
+          <p><strong id="resultsCount">0</strong> videos ready</p>
+          <button class="primary-btn" id="downloadZipBtn">
+            Download all (.zip)
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>Runs fully in your browser — your video never leaves this computer.</p>
+    </footer>
+
+    <script src="vendor/jszip.min.js"></script>
+    <script src="vendor/ffmpeg.js"></script>
+    <script src="app.js"></script>
+  </body>
 </html>
