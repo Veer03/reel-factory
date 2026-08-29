@@ -477,6 +477,31 @@ body {
   background: #000;
   border-radius: 8px;
   border: 1px solid var(--line);
+  max-height: 280px;
+  width: auto;
+}
+
+.position-field {
+  grid-column: span 2;
+}
+.position-presets {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.mini-btn {
+  flex: 1;
+  background: var(--ink);
+  border: 1px solid var(--line);
+  color: var(--paper-dim);
+  border-radius: 6px;
+  padding: 5px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.mini-btn:hover {
+  border-color: var(--lime);
+  color: var(--paper);
 }
 
 .stack-list {

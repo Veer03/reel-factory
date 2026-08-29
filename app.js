@@ -323,6 +323,7 @@
   ].forEach((el) => el.addEventListener("input", renderOverlayLivePreview));
 
   async function renderOverlayLivePreview() {
+    resizeLivePreviewCanvas();
     const cvs = overlayLivePreview;
     const ctx = cvs.getContext("2d");
     ctx.clearRect(0, 0, cvs.width, cvs.height);
@@ -347,9 +348,27 @@
       fontId: overlayFont.value,
       color: overlayColor.value,
       size: parseInt(overlaySize.value, 10),
-      position: overlayPosition.value,
+      position: parseInt(overlayPosition.value, 10),
       style: overlayStyle.value,
     };
+  }
+
+  overlayPosition.addEventListener("input", () => {
+    $("#overlayPositionValue").textContent = overlayPosition.value + "%";
+  });
+  document.querySelectorAll(".position-presets .mini-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      overlayPosition.value = btn.dataset.pos;
+      overlayPosition.dispatchEvent(new Event("input"));
+    });
+  });
+
+  function resizeLivePreviewCanvas() {
+    const targetH = 260;
+    overlayLivePreview.height = targetH;
+    overlayLivePreview.width = Math.round(
+      targetH * (state.format.w / state.format.h),
+    );
   }
 
   addOverlayBtn.addEventListener("click", () => {
@@ -377,8 +396,7 @@
         <div class="swatch" style="color:${ov.color}; font-family:'${font.family}'; font-weight:${font.weight}">${escapeHtml(ov.text.slice(0, 14))}</div>
         <div class="info">
           <div class="txt">${escapeHtml(ov.text)}</div>
-          <div class="meta">${font.label} · ${ov.position} · ${ov.style}</div>
-        </div>
+          <div class="meta">${font.label} · ${ov.position}% down · ${ov.style}</div>        </div>
         <button class="remove-x" title="remove">✕</button>`;
       row.querySelector(".remove-x").addEventListener("click", () => {
         state.overlays = state.overlays.filter((o) => o.id !== ov.id);
@@ -447,11 +465,12 @@
     const lineHeight = size * 1.18;
     const blockHeight = lines.length * lineHeight;
 
-    let startY;
-    if (overlay.position === "top") startY = H * 0.1 + size;
-    else if (overlay.position === "bottom")
-      startY = H * 0.9 - blockHeight + size;
-    else startY = (H - blockHeight) / 2 + size;
+    const posPct =
+      typeof overlay.position === "number"
+        ? overlay.position
+        : parseInt(overlay.position, 10) || 50;
+    const centerY = H * (posPct / 100);
+    let startY = centerY - blockHeight / 2 + size;
 
     const cx = W / 2;
 
@@ -670,15 +689,7 @@
           txCtx.clearRect(0, 0, W, H);
           await drawTextOverlay(txCtx, combo.ov, W, H, 1);
           const txBytes = await canvasToPngBytes(txCanvas);
-          if (i === 0) {
-            const dbgUrl = URL.createObjectURL(
-              new Blob([txBytes], { type: "image/png" }),
-            );
-            const a = document.createElement("a");
-            a.href = dbgUrl;
-            a.download = "debug-text-layer.png";
-            a.click();
-          }
+
           await ffmpeg.writeFile("tx.png", txBytes);
           hasText = true;
         }
