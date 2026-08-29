@@ -178,13 +178,29 @@
                 value="64"
               />
             </div>
-            <div class="field">
-              <label>position</label>
-              <select id="overlayPosition">
-                <option value="top">top</option>
-                <option value="center" selected>center</option>
-                <option value="bottom">bottom</option>
-              </select>
+            <div class="field position-field">
+              <label
+                >vertical position
+                <span id="overlayPositionValue">50%</span></label
+              >
+              <input
+                type="range"
+                id="overlayPosition"
+                min="5"
+                max="95"
+                value="50"
+              />
+              <div class="position-presets">
+                <button type="button" class="mini-btn" data-pos="12">
+                  top
+                </button>
+                <button type="button" class="mini-btn" data-pos="50">
+                  center
+                </button>
+                <button type="button" class="mini-btn" data-pos="88">
+                  bottom
+                </button>
+              </div>
             </div>
             <div class="field">
               <label>style</label>
