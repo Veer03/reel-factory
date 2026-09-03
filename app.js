@@ -184,6 +184,14 @@
         sourceMeta.hidden = false;
 
         unlock(step2);
+
+        const seekTo = Math.min(0.3, (previewVideo.duration || 1) * 0.1);
+        previewVideo.addEventListener(
+          "seeked",
+          () => renderOverlayLivePreview(),
+          { once: true },
+        );
+        previewVideo.currentTime = seekTo;
         renderOverlayLivePreview();
       },
       { once: true },
@@ -282,8 +290,8 @@
     renderBgList();
     unlock(step4);
     updateComboSummary();
+    renderOverlayLivePreview();
   }
-
   function renderBgList() {
     bgList.innerHTML = "";
     bgEmptyHint.hidden = state.backgrounds.length > 0;
@@ -297,6 +305,7 @@
         state.backgrounds = state.backgrounds.filter((b) => b.id !== bg.id);
         renderBgList();
         updateComboSummary();
+        renderOverlayLivePreview();
       });
       bgList.appendChild(chip);
     });
@@ -327,18 +336,15 @@
     const cvs = overlayLivePreview;
     const ctx = cvs.getContext("2d");
     ctx.clearRect(0, 0, cvs.width, cvs.height);
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, cvs.width, cvs.height);
+
+    const bg = state.backgrounds[0] || null;
+    drawBackground(ctx, bg, cvs.width, cvs.height);
+    drawContainVideoFrame(ctx, state.videoEl, cvs.width, cvs.height);
+
     const fmt = state.format;
     const scale = cvs.height / fmt.h;
     const overlay = currentOverlayDraft();
-    if (!overlay.text.trim()) {
-      ctx.fillStyle = "#55565f";
-      ctx.font = "12px Inter";
-      ctx.textAlign = "center";
-      ctx.fillText("type text above", cvs.width / 2, cvs.height / 2);
-      return;
-    }
+    if (!overlay.text.trim()) return;
     await drawTextOverlay(ctx, overlay, cvs.width, cvs.height, scale);
   }
 
@@ -356,12 +362,33 @@
   overlayPosition.addEventListener("input", () => {
     $("#overlayPositionValue").textContent = overlayPosition.value + "%";
   });
-  document.querySelectorAll(".position-presets .mini-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      overlayPosition.value = btn.dataset.pos;
-      overlayPosition.dispatchEvent(new Event("input"));
+  document
+    .querySelectorAll(".position-presets .mini-btn[data-pos]")
+    .forEach((btn) => {
+      btn.addEventListener("click", () => {
+        overlayPosition.value = btn.dataset.pos;
+        overlayPosition.dispatchEvent(new Event("input"));
+      });
     });
-  });
+
+  function autoPositionAboveVideo() {
+    if (!state.meta) return;
+    const fmt = state.format;
+    const scale = Math.min(fmt.w / state.meta.w, fmt.h / state.meta.h);
+    const videoDisplayHeight = state.meta.h * scale;
+    const videoTopPx = (fmt.h - videoDisplayHeight) / 2;
+    const size = parseInt(overlaySize.value, 10) || 64;
+    const gapPx = fmt.h * 0.02;
+    const approxTextHeight = size * 1.3;
+    const desiredCenterPx = videoTopPx - gapPx - approxTextHeight / 2;
+    const pct = Math.max(
+      3,
+      Math.min(95, Math.round((desiredCenterPx / fmt.h) * 100)),
+    );
+    overlayPosition.value = pct;
+    overlayPosition.dispatchEvent(new Event("input"));
+  }
+  $("#autoAboveBtn").addEventListener("click", autoPositionAboveVideo);
 
   function resizeLivePreviewCanvas() {
     const targetH = 260;
@@ -424,6 +451,13 @@
     } else {
       drawCover(ctx, bg.img, 0, 0, w, h);
     }
+  }
+  function drawContainVideoFrame(ctx, videoEl, w, h) {
+    if (!videoEl || !videoEl.videoWidth) return;
+    const scale = Math.min(w / videoEl.videoWidth, h / videoEl.videoHeight);
+    const dw = videoEl.videoWidth * scale,
+      dh = videoEl.videoHeight * scale;
+    ctx.drawImage(videoEl, (w - dw) / 2, (h - dh) / 2, dw, dh);
   }
 
   function wrapLines(ctx, text, maxWidth) {
