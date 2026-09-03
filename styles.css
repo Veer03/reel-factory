@@ -503,6 +503,10 @@ body {
   border-color: var(--lime);
   color: var(--paper);
 }
+#autoAboveBtn {
+  border-color: var(--lime);
+  color: var(--lime);
+}
 
 .stack-list {
   display: flex;
