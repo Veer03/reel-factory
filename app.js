@@ -291,6 +291,7 @@
     unlock(step4);
     updateComboSummary();
     renderOverlayLivePreview();
+    pickBg.value = bg.id;
   }
   function renderBgList() {
     bgList.innerHTML = "";
@@ -410,6 +411,7 @@
     overlayText.value = "";
     renderOverlayLivePreview();
     updateComboSummary();
+    pickOv.value = draft.id;
   });
 
   function renderOverlayList() {
