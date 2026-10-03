@@ -79,6 +79,65 @@
 
   let ffmpeg = null;
   let ffmpegReady = false;
+  let ffmpegProgressHooked = false;
+
+  /* ---------- batch timer state (no quality impact) ---------- */
+  let batchStart = 0;
+  let currentVideoStart = 0;
+  let currentProgress = 0; // 0..1 for the video currently encoding
+  let completedDurations = [];
+  let timerInterval = null;
+
+  function formatClock(ms) {
+    if (!isFinite(ms) || ms < 0) return "0:00";
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  function resetTimerUI() {
+    if (timerElapsed) timerElapsed.textContent = "Elapsed 0:00";
+    if (timerRemaining) timerRemaining.textContent = "calculating…";
+    if (timerEta) timerEta.textContent = "";
+  }
+
+  function updateTimerUI(total, done) {
+    if (!timerElapsed || !timerRemaining || !timerEta) return;
+    const now = performance.now();
+    const elapsed = batchStart ? now - batchStart : 0;
+    timerElapsed.textContent = `Elapsed ${formatClock(elapsed)}`;
+    const remainingCount = total - done;
+    if (remainingCount <= 0) return;
+    if (!completedDurations.length && done === 0) {
+      timerRemaining.textContent = "calculating…";
+      timerEta.textContent = done === 0 ? `Video 1 of ${total}` : "";
+      return;
+    }
+    const avg =
+      completedDurations.length > 0
+        ? completedDurations.reduce((a, b) => a + b, 0) /
+          completedDurations.length
+        : now - currentVideoStart;
+    // Discount the part of the current video already done (if ffmpeg gave us progress).
+    const currentDoneFrac =
+      done < total ? Math.max(0, Math.min(1, currentProgress || 0)) : 0;
+    const remainingMs =
+      avg * (remainingCount - 1) + avg * (1 - currentDoneFrac);
+    timerRemaining.textContent = `~${formatClock(remainingMs)} left`;
+    try {
+      const eta = new Date(Date.now() + Math.max(0, remainingMs));
+      const etaStr = eta.toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      timerEta.textContent = `Done ~${etaStr}`;
+    } catch (e) {
+      timerEta.textContent = "";
+    }
+  }
 
   /* ---------- element refs ---------- */
   const $ = (sel) => document.querySelector(sel);
@@ -125,6 +184,9 @@
   const progressArea = $("#progressArea");
   const progressFill = $("#progressFill");
   const progressLabel = $("#progressLabel");
+  const timerElapsed = $("#timerElapsed");
+  const timerRemaining = $("#timerRemaining");
+  const timerEta = $("#timerEta");
   const filmstrip = $("#filmstrip");
   const resultsBar = $("#resultsBar");
   const resultsCount = $("#resultsCount");
@@ -201,6 +263,12 @@
         previewVideo.currentTime = seekTo;
         renderOverlayLivePreview();
         updateVideoPosUI();
+        // Hide engine load latency from the batch timer.
+        if (typeof requestIdleCallback === "function") {
+          requestIdleCallback(() => prewarmEngine());
+        } else {
+          setTimeout(() => prewarmEngine(), 500);
+        }
       },
       { once: true },
     );
@@ -769,6 +837,20 @@
     const { FFmpeg } = FFmpegWASM;
     ffmpeg = new FFmpeg();
     ffmpeg.on("log", ({ message }) => console.log("[ffmpeg]", message));
+    // Live per-video progress (0..1) feeds the ETA ticker. Guarded: if this
+    // vendored build never emits progress, the timer falls back to per-video averages.
+    try {
+      if (!ffmpegProgressHooked) {
+        ffmpegProgressHooked = true;
+        ffmpeg.on("progress", ({ progress }) => {
+          if (isFinite(progress)) {
+            currentProgress = Math.max(0, Math.min(1, progress));
+          }
+        });
+      }
+    } catch (e) {
+      /* progress events unsupported — timer still works */
+    }
     await ffmpeg.load({
       coreURL: new URL("vendor/ffmpeg-core.js", document.baseURI).toString(),
       wasmURL: new URL("vendor/ffmpeg-core.wasm", document.baseURI).toString(),
@@ -776,6 +858,15 @@
     ffmpegReady = true;
     engineDot.className = "dot ready";
     engineStatusText.textContent = "engine ready";
+  }
+
+  // Safe speedup (no quality change): start downloading/compiling the engine
+  // in the background as soon as we have a source video, so Generate feels faster.
+  function prewarmEngine() {
+    if (ffmpegReady) return;
+    ensureEngineLoaded().catch((e) =>
+      console.warn("[engine prewarm failed]", e),
+    );
   }
 
   async function canvasToPngBytes(canvas) {
@@ -797,6 +888,17 @@
     state.results = [];
     progressFill.style.width = "0%";
 
+    // Timer init
+    batchStart = performance.now();
+    completedDurations = [];
+    currentProgress = 0;
+    resetTimerUI();
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(
+      () => updateTimerUI(combos.length, state.results.length),
+      500,
+    );
+
     combos.forEach((c, i) => {
       const f = document.createElement("div");
       f.className = "frame";
@@ -805,8 +907,14 @@
       filmstrip.appendChild(f);
     });
 
+    // Safe speedup cache (no quality change): identical backgrounds / text
+    // overlays reuse their already-encoded PNG bytes instead of re-rendering.
+    const bgCache = new Map();
+    const txCache = new Map();
+
     try {
       progressLabel.textContent = "Loading engine…";
+      updateTimerUI(combos.length, 0);
       await ensureEngineLoaded();
 
       progressLabel.textContent = "Reading source video…";
@@ -824,24 +932,35 @@
         const combo = combos[i];
         const frameEl = document.getElementById("frame-" + i);
         frameEl.className = "frame working";
+        currentVideoStart = performance.now();
+        currentProgress = 0;
         progressLabel.textContent = `Rendering video ${i + 1} of ${combos.length}…`;
+        updateTimerUI(combos.length, i);
 
-        const bgCanvas = document.createElement("canvas");
-        bgCanvas.width = W;
-        bgCanvas.height = H;
-        drawBackground(bgCanvas.getContext("2d"), combo.bg, W, H);
-        const bgBytes = await canvasToPngBytes(bgCanvas);
+        let bgBytes = bgCache.get(combo.bg.id);
+        if (!bgBytes) {
+          const bgCanvas = document.createElement("canvas");
+          bgCanvas.width = W;
+          bgCanvas.height = H;
+          drawBackground(bgCanvas.getContext("2d"), combo.bg, W, H);
+          bgBytes = await canvasToPngBytes(bgCanvas);
+          bgCache.set(combo.bg.id, bgBytes);
+        }
         await ffmpeg.writeFile("bg.png", bgBytes);
 
         let hasText = false;
         if (combo.ov) {
-          const txCanvas = document.createElement("canvas");
-          txCanvas.width = W;
-          txCanvas.height = H;
-          const txCtx = txCanvas.getContext("2d");
-          txCtx.clearRect(0, 0, W, H);
-          await drawTextOverlay(txCtx, combo.ov, W, H, 1);
-          const txBytes = await canvasToPngBytes(txCanvas);
+          let txBytes = txCache.get(combo.ov.id);
+          if (!txBytes) {
+            const txCanvas = document.createElement("canvas");
+            txCanvas.width = W;
+            txCanvas.height = H;
+            const txCtx = txCanvas.getContext("2d");
+            txCtx.clearRect(0, 0, W, H);
+            await drawTextOverlay(txCtx, combo.ov, W, H, 1);
+            txBytes = await canvasToPngBytes(txCanvas);
+            txCache.set(combo.ov.id, txBytes);
+          }
 
           await ffmpeg.writeFile("tx.png", txBytes);
           hasText = true;
@@ -898,21 +1017,36 @@
         if (hasText) await ffmpeg.deleteFile("tx.png");
         await ffmpeg.deleteFile("bg.png");
 
+        completedDurations.push(performance.now() - currentVideoStart);
+        currentProgress = 1;
+
         frameEl.className = "frame done";
         frameEl.innerHTML = `<video muted playsinline src="${url}"></video><span class="lbl">${i + 1}</span>`;
         progressFill.style.width = `${Math.round(((i + 1) / combos.length) * 100)}%`;
+        updateTimerUI(combos.length, state.results.length);
       }
 
       await ffmpeg.deleteFile(srcName);
 
-      progressLabel.textContent = `Done — ${combos.length} videos ready.`;
+      const totalMs = performance.now() - batchStart;
+      progressLabel.textContent = `Done — ${combos.length} videos ready in ${formatClock(totalMs)}.`;
+      if (timerRemaining)
+        timerRemaining.textContent = `Done in ${formatClock(totalMs)}`;
+      if (timerElapsed)
+        timerElapsed.textContent = `Elapsed ${formatClock(totalMs)}`;
+      if (timerEta) timerEta.textContent = `${combos.length} videos ready`;
       resultsCount.textContent = combos.length;
       resultsBar.hidden = false;
     } catch (err) {
       console.error(err);
       progressLabel.textContent =
         "Something went wrong: " + (err && err.message ? err.message : err);
+      if (timerRemaining) timerRemaining.textContent = "paused (error)";
     } finally {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
       generateBtn.disabled = false;
     }
   }
