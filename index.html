@@ -214,6 +214,39 @@
               </select>
             </div>
           </div>
+          <div class="clip-pos-row">
+            <div class="field">
+              <label
+                >clip vertical position
+                <span id="videoPositionValue">50%</span></label
+              >
+              <input
+                type="range"
+                id="videoPosition"
+                min="0"
+                max="100"
+                value="50"
+              />
+              <div class="position-presets">
+                <button type="button" class="mini-btn" data-vpos="0">
+                  top
+                </button>
+                <button type="button" class="mini-btn" data-vpos="50">
+                  center
+                </button>
+                <button type="button" class="mini-btn" data-vpos="100">
+                  bottom
+                </button>
+              </div>
+              <p class="hint" id="videoNoRoomHint" hidden>
+                Clip fills the frame height — no room to move up/down.
+              </p>
+              <p class="hint">
+                Moves the clip for every video. Tip: you can also drag the
+                clip up/down directly in the preview.
+              </p>
+            </div>
+          </div>
           <div class="overlay-add-row">
             <canvas id="overlayLivePreview" width="220" height="120"></canvas>
             <button class="primary-btn small" id="addOverlayBtn">

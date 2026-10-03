@@ -358,6 +358,24 @@ body {
   color: var(--paper-dim);
   font-family: var(--mono);
 }
+.clip-pos-row {
+  margin-top: 14px;
+  background: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.clip-pos-row .position-presets {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.clip-pos-row .hint {
+  font-size: 12px;
+  opacity: 0.75;
+  color: var(--paper-dim);
+  margin: 8px 0 0;
+}
 
 /* ============ step 3 backgrounds ============ */
 .add-row {
@@ -479,6 +497,11 @@ body {
   border: 1px solid var(--line);
   max-height: 280px;
   width: auto;
+  cursor: ns-resize;
+  touch-action: none;
+}
+#overlayLivePreview.dragging {
+  border-color: var(--lime);
 }
 
 .position-field {

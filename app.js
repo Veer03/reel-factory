@@ -72,6 +72,7 @@
     overlays: [],
     results: [],
     queue: [], // {id, bg, ov}
+    videoPosition: 50, // 0=top-aligned, 50=centered, 100=bottom-aligned (global)
   };
   let idSeq = 1;
   const uid = () => "id" + idSeq++;
@@ -93,6 +94,9 @@
     step4 = $("#step4"),
     step5 = $("#step5");
   const formatGrid = $("#formatGrid");
+  const videoPosition = $("#videoPosition");
+  const videoPositionValue = $("#videoPositionValue");
+  const videoNoRoomHint = $("#videoNoRoomHint");
 
   const addColorBtn = $("#addColorBtn");
   const addImageBtn = $("#addImageBtn");
@@ -188,11 +192,15 @@
         const seekTo = Math.min(0.3, (previewVideo.duration || 1) * 0.1);
         previewVideo.addEventListener(
           "seeked",
-          () => renderOverlayLivePreview(),
+          () => {
+            renderOverlayLivePreview();
+            updateVideoPosUI();
+          },
           { once: true },
         );
         previewVideo.currentTime = seekTo;
         renderOverlayLivePreview();
+        updateVideoPosUI();
       },
       { once: true },
     );
@@ -229,12 +237,111 @@
         renderFormatGrid();
         unlock(step3);
         renderOverlayLivePreview();
+        updateVideoPosUI();
         updateComboSummary();
       });
       formatGrid.appendChild(div);
     });
   }
   renderFormatGrid();
+
+  /* ============================================================
+     Clip (video) vertical position, global for all outputs.
+     UI lives in Step 4 next to the text overlay preview.
+     0 = top-aligned, 50 = centered, 100 = bottom-aligned.
+     Clamped so the clip always stays fully visible.
+     ============================================================ */
+  function clampVideoPos(v) {
+    const n = parseInt(v, 10);
+    if (!isFinite(n)) return 50;
+    return Math.max(0, Math.min(100, n));
+  }
+
+  function setVideoPosition(v, rerender = true) {
+    state.videoPosition = clampVideoPos(v);
+    if (videoPosition) videoPosition.value = state.videoPosition;
+    if (videoPositionValue)
+      videoPositionValue.textContent = state.videoPosition + "%";
+    if (rerender) renderOverlayLivePreview();
+    updateVideoPosUI();
+  }
+
+  function videoFreeSpacePx(fmtW, fmtH, meta) {
+    if (!meta || !meta.w || !meta.h) return 0;
+    const scale = Math.min(fmtW / meta.w, fmtH / meta.h);
+    return Math.max(0, fmtH - meta.h * scale);
+  }
+
+  function updateVideoPosUI() {
+    if (!videoNoRoomHint) return;
+    const free = videoFreeSpacePx(
+      state.format.w,
+      state.format.h,
+      state.meta,
+    );
+    videoNoRoomHint.hidden = !(state.meta && free < 2);
+    if (videoPosition) videoPosition.disabled = Boolean(state.meta && free < 2);
+  }
+
+  if (videoPosition) {
+    videoPosition.addEventListener("input", () => {
+      setVideoPosition(videoPosition.value);
+    });
+  }
+  document
+    .querySelectorAll(".mini-btn[data-vpos]")
+    .forEach((btn) => {
+      btn.addEventListener("click", () => {
+        setVideoPosition(btn.dataset.vpos);
+      });
+    });
+
+  // Drag the clip up/down directly in the live preview canvas.
+  // Maps pointer travel onto the free letterbox space so it can never crop.
+  (() => {
+    if (!overlayLivePreview) return;
+    let dragging = false;
+    let startClientY = 0;
+    let startPos = 50;
+    let freeCanvasPx = 0;
+
+    function canvasVideoMetrics() {
+      const cvs = overlayLivePreview;
+      const vw = state.videoEl ? state.videoEl.videoWidth : 0;
+      const vh = state.videoEl ? state.videoEl.videoHeight : 0;
+      if (!vw || !vh) return null;
+      const scale = Math.min(cvs.width / vw, cvs.height / vh);
+      const dispH = vh * scale;
+      return { free: cvs.height - dispH };
+    }
+
+    overlayLivePreview.addEventListener("pointerdown", (e) => {
+      const m = canvasVideoMetrics();
+      if (!m || m.free < 2) return;
+      dragging = true;
+      startClientY = e.clientY;
+      startPos = state.videoPosition;
+      freeCanvasPx = m.free;
+      overlayLivePreview.classList.add("dragging");
+      overlayLivePreview.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    overlayLivePreview.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      const rect = overlayLivePreview.getBoundingClientRect();
+      const scaleY = overlayLivePreview.height / rect.height;
+      const dyCanvas = (e.clientY - startClientY) * scaleY;
+      const dPct = freeCanvasPx > 0 ? (dyCanvas / freeCanvasPx) * 100 : 0;
+      setVideoPosition(Math.round(startPos + dPct));
+    });
+    const endDrag = () => {
+      dragging = false;
+      overlayLivePreview.classList.remove("dragging");
+    };
+    overlayLivePreview.addEventListener("pointerup", endDrag);
+    overlayLivePreview.addEventListener("pointercancel", endDrag);
+  })();
+  setVideoPosition(50, false);
 
   /* ============================================================
      STEP 3 — backgrounds
@@ -340,7 +447,13 @@
 
     const bg = state.backgrounds[0] || null;
     drawBackground(ctx, bg, cvs.width, cvs.height);
-    drawContainVideoFrame(ctx, state.videoEl, cvs.width, cvs.height);
+    drawContainVideoFrame(
+      ctx,
+      state.videoEl,
+      cvs.width,
+      cvs.height,
+      state.videoPosition,
+    );
 
     const fmt = state.format;
     const scale = cvs.height / fmt.h;
@@ -377,7 +490,8 @@
     const fmt = state.format;
     const scale = Math.min(fmt.w / state.meta.w, fmt.h / state.meta.h);
     const videoDisplayHeight = state.meta.h * scale;
-    const videoTopPx = (fmt.h - videoDisplayHeight) / 2;
+    const vPos = clampVideoPos(state.videoPosition) / 100;
+    const videoTopPx = (fmt.h - videoDisplayHeight) * vPos;
     const size = parseInt(overlaySize.value, 10) || 64;
     const gapPx = fmt.h * 0.02;
     const approxTextHeight = size * 1.3;
@@ -454,12 +568,15 @@
       drawCover(ctx, bg.img, 0, 0, w, h);
     }
   }
-  function drawContainVideoFrame(ctx, videoEl, w, h) {
+  function drawContainVideoFrame(ctx, videoEl, w, h, posPct = 50) {
     if (!videoEl || !videoEl.videoWidth) return;
     const scale = Math.min(w / videoEl.videoWidth, h / videoEl.videoHeight);
     const dw = videoEl.videoWidth * scale,
       dh = videoEl.videoHeight * scale;
-    ctx.drawImage(videoEl, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    const p = clampVideoPos(posPct) / 100;
+    const dx = (w - dw) / 2;
+    const dy = (h - dh) * p; // 0=top, 0.5=center, 1=bottom — always fully visible
+    ctx.drawImage(videoEl, dx, dy, dw, dh);
   }
 
   function wrapLines(ctx, text, maxWidth) {
@@ -734,9 +851,11 @@
         const args = ["-loop", "1", "-i", "bg.png", "-i", srcName];
         if (hasText) args.push("-loop", "1", "-i", "tx.png");
 
+        const vFrac = (clampVideoPos(state.videoPosition) / 100).toFixed(3);
+        const yExpr = `(${H}-h)*${vFrac}`;
         const filter = hasText
-          ? `[1:v]scale=${W}:${H}:force_original_aspect_ratio=decrease[v1];[0:v][v1]overlay=(${W}-w)/2:(${H}-h)/2[b1];[b1][2:v]overlay=0:0:shortest=1[outv]`
-          : `[1:v]scale=${W}:${H}:force_original_aspect_ratio=decrease[v1];[0:v][v1]overlay=(${W}-w)/2:(${H}-h)/2:shortest=1[outv]`;
+          ? `[1:v]scale=${W}:${H}:force_original_aspect_ratio=decrease[v1];[0:v][v1]overlay=(${W}-w)/2:${yExpr}[b1];[b1][2:v]overlay=0:0:shortest=1[outv]`
+          : `[1:v]scale=${W}:${H}:force_original_aspect_ratio=decrease[v1];[0:v][v1]overlay=(${W}-w)/2:${yExpr}:shortest=1[outv]`;
 
         const durSec = isFinite(state.meta.duration)
           ? state.meta.duration
